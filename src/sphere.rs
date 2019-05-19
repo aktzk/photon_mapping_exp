@@ -41,9 +41,9 @@ impl Sphere {
             let det_sqrt = det.sqrt();
             let t1 = b - det_sqrt;
             let t2 = b + det_sqrt;
-            if t1 > 0.01 {
+            if t1 > 0.00001 {
                 Some(t1)
-            } else if t2 > 0.01 {
+            } else if t2 > 0.00001 {
                 Some(t2)
             } else {
                 None
