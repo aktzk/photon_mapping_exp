@@ -1,5 +1,5 @@
 use crate::ray::Ray;
-use glm::Vec3;
+use glm::DVec3;
 #[derive(Eq, PartialEq)]
 pub enum Reflection {
     Diffuse,
@@ -7,19 +7,19 @@ pub enum Reflection {
 }
 
 pub struct Sphere {
-    pub radius: f32,
-    pub pos: Vec3,
-    pub color: Vec3,
-    pub emission: Vec3,
+    pub radius: f64,
+    pub pos: DVec3,
+    pub color: DVec3,
+    pub emission: DVec3,
     pub reflection: Reflection,
 }
 
 impl Sphere {
     pub fn new(
-        radius: f32,
-        pos: Vec3,
-        emission: Vec3,
-        color: Vec3,
+        radius: f64,
+        pos: DVec3,
+        emission: DVec3,
+        color: DVec3,
         reflection: Reflection,
     ) -> Self {
         Self {
@@ -31,7 +31,7 @@ impl Sphere {
         }
     }
 
-    pub fn intersect(&self, ray: &Ray) -> Option<f32> {
+    pub fn intersect(&self, ray: &Ray) -> Option<f64> {
         let ray_to_pos = self.pos - ray.pos;
         let b = ray_to_pos.dot(&ray.dir);
         let det = b * b - ray_to_pos.dot(&ray_to_pos) + self.radius * self.radius;
@@ -41,7 +41,6 @@ impl Sphere {
             let det_sqrt = det.sqrt();
             let t1 = b - det_sqrt;
             let t2 = b + det_sqrt;
-            //自己衝突防ぐ
             if t1 > 0.01 {
                 Some(t1)
             } else if t2 > 0.01 {

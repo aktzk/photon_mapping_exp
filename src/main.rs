@@ -5,7 +5,7 @@ mod scene;
 mod sphere;
 mod trace;
 mod utility;
-use indicatif::{HumanDuration};
+use indicatif::HumanDuration;
 use rayon::prelude::*;
 use std::time::Instant;
 use trace::*;
@@ -17,10 +17,10 @@ const HEIGHT: usize = 500;
 const PHOTON_NUM_CAUSTICS: usize = 500_00;
 const PHOTON_NUM_INDIRECT: usize = 100_00;
 fn main() {
-    let camera_pos = glm::Vec3::new(50.0, 52.0, 325.6);
-    let camera_dir = glm::Vec3::new(0.0, -0.05612, -0.5).normalize();
-    let elem = WIDTH as f32 * 0.5135 / HEIGHT as f32;
-    let cx = glm::Vec3::new(elem, 0.0, 0.0);
+    let camera_pos = glm::DVec3::new(50.0, 52.0, 325.6);
+    let camera_dir = glm::DVec3::new(0.0, -0.05612, -0.5).normalize();
+    let elem = WIDTH as f64 * 0.5135 / HEIGHT as f64;
+    let cx = glm::DVec3::new(elem, 0.0, 0.0);
     let cy = cx.cross(&camera_dir).normalize() * 0.5135;
     let mut rand = rand::thread_rng();
 
@@ -39,9 +39,9 @@ fn main() {
         &mut rand,
     ));
 
-    let mut bytes_caustics = vec![0f32; WIDTH as usize * HEIGHT as usize * BYTES_PER_PIXEL];
-    let mut bytes_indirect = vec![0f32; WIDTH as usize * HEIGHT as usize * BYTES_PER_PIXEL];
-    let mut bytes_direct = vec![0f32; WIDTH as usize * HEIGHT as usize * BYTES_PER_PIXEL];
+    let mut bytes_caustics = vec![0f64; WIDTH as usize * HEIGHT as usize * BYTES_PER_PIXEL];
+    let mut bytes_indirect = vec![0f64; WIDTH as usize * HEIGHT as usize * BYTES_PER_PIXEL];
+    let mut bytes_direct = vec![0f64; WIDTH as usize * HEIGHT as usize * BYTES_PER_PIXEL];
 
     let timer = Instant::now();
     println!("Photon Tracing: Caustics");
@@ -54,7 +54,7 @@ fn main() {
             let mut rng = rand::thread_rng();
             let y = idx / WIDTH as usize;
             let x = idx % WIDTH as usize;
-            let mut radiance = glm::zero::<glm::Vec3>();
+            let mut radiance = glm::zero::<glm::DVec3>();
             for sx in 0..2 {
                 for sy in 0..2 {
                     let p_ray = primary_ray(
@@ -71,9 +71,9 @@ fn main() {
                         estimate_radiance_caustics(&scene, &p_ray, &photon_map_caustics, 256.0, 64);
                 }
             }
-            chunk[0] = radiance.x as f32;
-            chunk[1] = radiance.y as f32;
-            chunk[2] = radiance.z as f32;
+            chunk[0] = radiance.x as f64;
+            chunk[1] = radiance.y as f64;
+            chunk[2] = radiance.z as f64;
         });
     println!("Done. Took {}", HumanDuration(timer.elapsed()));
 
@@ -88,7 +88,7 @@ fn main() {
             let mut rng = rand::thread_rng();
             let y = idx / WIDTH as usize;
             let x = idx % WIDTH as usize;
-            let mut radiance = glm::zero::<glm::Vec3>();
+            let mut radiance = glm::zero::<glm::DVec3>();
             for sx in 0..2 {
                 for sy in 0..2 {
                     let p_ray = primary_ray(
@@ -112,9 +112,9 @@ fn main() {
                     );
                 }
             }
-            chunk[0] = radiance.x as f32;
-            chunk[1] = radiance.y as f32;
-            chunk[2] = radiance.z as f32;
+            chunk[0] = radiance.x as f64;
+            chunk[1] = radiance.y as f64;
+            chunk[2] = radiance.z as f64;
         });
     println!("Done. Took {}", HumanDuration(timer.elapsed()));
 
@@ -129,7 +129,7 @@ fn main() {
             let mut rng = rand::thread_rng();
             let y = idx / WIDTH as usize;
             let x = idx % WIDTH as usize;
-            let mut radiance = glm::zero::<glm::Vec3>();
+            let mut radiance = glm::zero::<glm::DVec3>();
             for sx in 0..2 {
                 for sy in 0..2 {
                     let p_ray = primary_ray(
@@ -145,9 +145,9 @@ fn main() {
                     radiance += estimate_radiance_direct(&scene, &p_ray, 0, &mut rng);
                 }
             }
-            chunk[0] = radiance.x as f32;
-            chunk[1] = radiance.y as f32;
-            chunk[2] = radiance.z as f32;
+            chunk[0] = radiance.x as f64;
+            chunk[1] = radiance.y as f64;
+            chunk[2] = radiance.z as f64;
         });
     println!("Done. Took {}", HumanDuration(timer.elapsed()));
 

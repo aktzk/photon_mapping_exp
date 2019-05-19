@@ -1,16 +1,16 @@
-use glm::Vec3;
+use glm::DVec3;
 use ordered_float::OrderedFloat;
 use std::collections::BinaryHeap;
 use std::sync::Arc;
 
 pub struct Photon {
-    pub pos: Vec3,
-    pub power: Vec3,
-    pub incoming_dir: Vec3,
+    pub pos: DVec3,
+    pub power: DVec3,
+    pub incoming_dir: DVec3,
 }
 
 impl Photon {
-    pub fn new(pos: Vec3, power: Vec3, incoming_dir: Vec3) -> Self {
+    pub fn new(pos: DVec3, power: DVec3, incoming_dir: DVec3) -> Self {
         Self {
             pos,
             power,
@@ -50,10 +50,10 @@ impl PhotonMap {
         &self,
         result: &mut NearestPhotons,
         node: &TreeNode,
-        max_distance2: f32,
+        max_distance2: f64,
         max_collect_num: usize,
-        center_pos: &glm::Vec3,
-        normal: &glm::Vec3,
+        center_pos: &glm::DVec3,
+        normal: &glm::DVec3,
     ) {
         let photon = &node.photon;
 
@@ -157,11 +157,11 @@ impl TreeNode {
 // 近傍のフォトンの情報
 pub struct NeighborPhoton {
     pub photon: Arc<Photon>,
-    pub distance2: OrderedFloat<f32>,
+    pub distance2: OrderedFloat<f64>,
 }
 
 impl NeighborPhoton {
-    pub fn new(photon: Arc<Photon>, distance2: f32) -> Self {
+    pub fn new(photon: Arc<Photon>, distance2: f64) -> Self {
         Self {
             photon,
             distance2: OrderedFloat(distance2),
@@ -202,18 +202,18 @@ impl NearestPhotons {
 }
 
 pub struct PhotonCollectArg {
-    pub max_distance2: f32,
+    pub max_distance2: f64,
     pub max_collect_num: usize,
-    pub center_pos: glm::Vec3,
-    pub normal: glm::Vec3,
+    pub center_pos: glm::DVec3,
+    pub normal: glm::DVec3,
 }
 
 impl PhotonCollectArg {
     pub fn new(
-        max_distance2: f32,
+        max_distance2: f64,
         max_collect_num: usize,
-        center_pos: glm::Vec3,
-        normal: glm::Vec3,
+        center_pos: glm::DVec3,
+        normal: glm::DVec3,
     ) -> Self {
         Self {
             max_distance2,
@@ -228,9 +228,9 @@ fn construct_kd_tree(
     photons: &mut Vec<Arc<Photon>>,
     begin: usize,
     end: usize,
-    depth: i32,
+    depth: i64,
 ) -> Option<Box<TreeNode>> {
-    if end as i32 - begin as i32 <= 0 {
+    if end as i64 - begin as i64 <= 0 {
         return None;
     }
     let axis = match depth % 3 {

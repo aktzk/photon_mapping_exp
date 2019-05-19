@@ -4,11 +4,11 @@ use crate::scene::{Scene, LIGHT_ID};
 use crate::sphere::Reflection;
 use crate::utility::{random_vec_hemisphere, random_vec_sphere};
 use rand::Rng;
-use std::f32::consts::PI;
+use std::f64::consts::PI;
 use std::sync::Arc;
 
-const REFRACTION_ATM: f32 = 1.000_293; //1atm0度の空気の絶対屈折率
-const REFRACTION_DIA: f32 = 2.419; //ダイヤモンドの絶対屈折率
+const REFRACTION_ATM: f64 = 1.000_293; //1atm0度の空気の絶対屈折率
+const REFRACTION_DIA: f64 = 2.419; //ダイヤモンドの絶対屈折率
 pub fn create_photon_map_caustics(
     photon_num: usize,
     scene: &Scene,
@@ -22,12 +22,12 @@ pub fn create_photon_map_caustics(
     for _ in 0..photon_num {
         let light = &scene.spheres[LIGHT_ID];
         let random_dir = random_vec_sphere(rand);
-        let light_pos = light.pos + random_dir * (light.radius + 0.001);
+        let light_pos = light.pos + random_dir * light.radius;
         let light_dir = random_vec_hemisphere(&random_dir, rand);
 
-        let mut current_ray = Ray::new(light_pos, light_dir);
+        let mut current_ray = Ray::new_with_offset(light_pos, light_dir, &random_dir);
         let mut current_flux =
-            light.emission * 4.0 * PI * PI * light.radius * light.radius / (photon_num as f32);
+            light.emission * 4.0 * PI * PI * light.radius * light.radius / (photon_num as f64);
 
         let mut reflect_count = 0;
 
@@ -61,7 +61,7 @@ pub fn create_photon_map_caustics(
                             &surface_normal,
                         ) {
                             Refraction::TotalReflection(dir) => {
-                                current_ray = Ray::new(hit_pos, dir);
+                                current_ray = Ray::new_with_offset(hit_pos, dir, &surface_normal);
                                 current_flux = glm::matrix_comp_mult(&current_flux, &sphere.color);
                             }
                             Refraction::ReflectionOrTransmission(
@@ -69,11 +69,19 @@ pub fn create_photon_map_caustics(
                                 (refract_dir, tp),
                                 probability,
                             ) => {
-                                if rand.gen::<f32>() < probability {
-                                    current_ray = Ray::new(hit_pos, reflect_dir);
+                                if rand.gen::<f64>() < probability {
+                                    current_ray = Ray::new_with_offset(
+                                        hit_pos,
+                                        reflect_dir,
+                                        &geometry_normal,
+                                    );
                                     current_flux *= rp;
                                 } else {
-                                    current_ray = Ray::new(hit_pos, refract_dir);
+                                    current_ray = Ray::new_with_offset(
+                                        hit_pos,
+                                        refract_dir,
+                                        &(-geometry_normal),
+                                    );
                                     current_flux *= tp;
                                 }
                             }
@@ -103,17 +111,17 @@ pub fn create_photon_map_indirect(
     let mut photons = Vec::new();
     for _ in 0..photon_num {
         let light = &scene.spheres[LIGHT_ID];
+        let random_dir = random_vec_sphere(rand);
         let (light_pos, light_dir) = {
-            let random_dir = random_vec_sphere(rand);
             (
-                light.pos + random_dir * (light.radius + 0.0001),
+                light.pos + random_dir * light.radius,
                 random_vec_hemisphere(&random_dir, rand),
             )
         };
 
-        let mut current_ray = Ray::new(light_pos, light_dir);
+        let mut current_ray = Ray::new_with_offset(light_pos, light_dir, &random_dir);
         let mut current_flux =
-            light.emission * 4.0 * PI * PI * light.radius * light.radius / (photon_num as f32);
+            light.emission * 4.0 * PI * PI * light.radius * light.radius / (photon_num as f64);
         let mut scatter_count = 0;
         let max_depth = 8;
         for _ in 0..max_depth {
@@ -133,7 +141,7 @@ pub fn create_photon_map_indirect(
                 match sphere.reflection {
                     Reflection::Diffuse => {
                         let probability = (sphere.color.x + sphere.color.y + sphere.color.z) / 3.0;
-                        if probability < rand.gen::<f32>() && scatter_count > 0 {
+                        if probability < rand.gen::<f64>() && scatter_count > 0 {
                             photons.push(Arc::new(Photon::new(
                                 hit_pos,
                                 current_flux,
@@ -142,7 +150,7 @@ pub fn create_photon_map_indirect(
                             break;
                         } else {
                             let dir = random_vec_hemisphere(&surface_normal, rand);
-                            current_ray = Ray::new(hit_pos, dir);
+                            current_ray = Ray::new_with_offset(hit_pos, dir, &surface_normal);
                             current_flux =
                                 glm::matrix_comp_mult(&current_flux, &sphere.color) / probability;
                             scatter_count += 1;
@@ -156,7 +164,7 @@ pub fn create_photon_map_indirect(
                             &surface_normal,
                         ) {
                             Refraction::TotalReflection(dir) => {
-                                current_ray = Ray::new(hit_pos, dir);
+                                current_ray = Ray::new_with_offset(hit_pos, dir, &surface_normal);
                                 current_flux = glm::matrix_comp_mult(&current_flux, &sphere.color);
                             }
                             Refraction::ReflectionOrTransmission(
@@ -164,11 +172,16 @@ pub fn create_photon_map_indirect(
                                 (refract_dir, tp),
                                 probability,
                             ) => {
-                                if rand.gen::<f32>() < probability {
-                                    current_ray = Ray::new(hit_pos, reflect_dir);
+                                if rand.gen::<f64>() < probability {
+                                    current_ray =
+                                        Ray::new_with_offset(hit_pos, reflect_dir, &surface_normal);
                                     current_flux *= rp;
                                 } else {
-                                    current_ray = Ray::new(hit_pos, refract_dir);
+                                    current_ray = Ray::new_with_offset(
+                                        hit_pos,
+                                        refract_dir,
+                                        &(-surface_normal),
+                                    );
                                     current_flux *= tp;
                                 }
                             }
@@ -187,11 +200,11 @@ pub fn create_photon_map_indirect(
 }
 fn estimate_irradiance(
     photon_map: &PhotonMap,
-    pos: &glm::Vec3,
-    normal: &glm::Vec3,
-    collect_radius: f32,
+    pos: &glm::DVec3,
+    normal: &glm::DVec3,
+    collect_radius: f64,
     max_photon_num: usize,
-) -> glm::Vec3 {
+) -> glm::DVec3 {
     let arg = PhotonCollectArg::new(
         collect_radius * collect_radius,
         max_photon_num,
@@ -200,7 +213,7 @@ fn estimate_irradiance(
     );
     let nearest_photons = photon_map.collect_photons(&arg);
 
-    let mut accumulated_flux = glm::zero::<glm::Vec3>();
+    let mut accumulated_flux = glm::zero::<glm::DVec3>();
     let max_distance2 = nearest_photons
         .queue
         .peek()
@@ -222,9 +235,9 @@ pub fn estimate_radiance_caustics(
     scene: &Scene,
     ray: &Ray,
     photon_map: &PhotonMap,
-    collect_radius: f32,
+    collect_radius: f64,
     collect_max_photon_num: usize,
-) -> glm::Vec3 {
+) -> glm::DVec3 {
     if let Some((dist, idx)) = scene.intersect(ray) {
         let sphere = &scene.spheres[idx];
         let hit_pos = ray.pos + ray.dir * dist;
@@ -256,10 +269,10 @@ pub fn estimate_radiance_indirect(
     ray: &Ray,
     photon_map: &PhotonMap,
     depth: usize,
-    col_rad: f32,
+    col_rad: f64,
     col_max_num: usize,
     rand: &mut rand::rngs::ThreadRng,
-) -> glm::Vec3 {
+) -> glm::DVec3 {
     if let Some((dist, idx)) = scene.intersect(ray) {
         if idx == 0 {
             return glm::zero();
@@ -278,7 +291,7 @@ pub fn estimate_radiance_indirect(
         let mut russian_roulette_probability =
             glm::max3_scalar(sphere.color.x, sphere.color.y, sphere.color.z);
         if depth > 8 {
-            if rand.gen::<f32>() >= russian_roulette_probability {
+            if rand.gen::<f64>() >= russian_roulette_probability {
                 return sphere.emission;
             }
         } else {
@@ -287,11 +300,11 @@ pub fn estimate_radiance_indirect(
         match sphere.reflection {
             Reflection::Diffuse => {
                 if depth == 0 {
-                    let mut accum = glm::zero::<glm::Vec3>();
+                    let mut accum = glm::zero::<glm::DVec3>();
                     for _ in 0..8 {
                         let scatter_dir = random_vec_hemisphere(&surface_normal, rand);
-                        // 自己衝突回避
-                        let scatter_ray = Ray::new(hit_pos + surface_normal * 0.1, scatter_dir);
+                        let scatter_ray =
+                            Ray::new_with_offset(hit_pos, scatter_dir, &surface_normal);
                         accum += estimate_radiance_indirect(
                             scene,
                             &scatter_ray,
@@ -313,7 +326,7 @@ pub fn estimate_radiance_indirect(
                         col_max_num,
                     );
                     return glm::matrix_comp_mult(&sphere.color, &irradiance)
-                        * std::f32::consts::FRAC_1_PI
+                        * std::f64::consts::FRAC_1_PI
                         / russian_roulette_probability;
                 }
             }
@@ -323,7 +336,7 @@ pub fn estimate_radiance_indirect(
                 } else {
                     match calc_refraction_behavior(&ray.dir, &geometry_normal, &surface_normal) {
                         Refraction::TotalReflection(dir) => {
-                            let ray = Ray::new(hit_pos, dir);
+                            let ray = Ray::new_with_offset(hit_pos, dir, &surface_normal);
                             return sphere.emission
                                 + glm::matrix_comp_mult(
                                     &sphere.color,
@@ -344,8 +357,9 @@ pub fn estimate_radiance_indirect(
                             probability,
                         ) => {
                             if depth > 2 {
-                                if rand.gen::<f32>() < probability {
-                                    let ray = Ray::new(hit_pos, reflect_dir);
+                                if rand.gen::<f64>() < probability {
+                                    let ray =
+                                        Ray::new_with_offset(hit_pos, reflect_dir, &surface_normal);
                                     let rad = glm::matrix_comp_mult(
                                         &sphere.color,
                                         &(estimate_radiance_indirect(
@@ -361,7 +375,11 @@ pub fn estimate_radiance_indirect(
                                         / russian_roulette_probability;
                                     return sphere.emission + rad;
                                 } else {
-                                    let ray = Ray::new(hit_pos, refract_dir);
+                                    let ray = Ray::new_with_offset(
+                                        hit_pos,
+                                        refract_dir,
+                                        &(-surface_normal),
+                                    );
                                     let rad = glm::matrix_comp_mult(
                                         &sphere.color,
                                         &(estimate_radiance_indirect(
@@ -378,8 +396,10 @@ pub fn estimate_radiance_indirect(
                                     return sphere.emission + rad;
                                 }
                             } else {
-                                let ray_re = Ray::new(hit_pos, reflect_dir);
-                                let ray_tr = Ray::new(hit_pos, refract_dir);
+                                let ray_re =
+                                    Ray::new_with_offset(hit_pos, reflect_dir, &surface_normal);
+                                let ray_tr =
+                                    Ray::new_with_offset(hit_pos, refract_dir, &(-surface_normal));
                                 let rad = estimate_radiance_indirect(
                                     scene,
                                     &ray_re,
@@ -417,7 +437,7 @@ pub fn estimate_radiance_direct(
     ray: &Ray,
     depth: usize,
     rand: &mut rand::rngs::ThreadRng,
-) -> glm::Vec3 {
+) -> glm::DVec3 {
     if let Some((t, id)) = scene.intersect(ray) {
         let sphere = &scene.spheres[id];
         if id == LIGHT_ID {
@@ -434,12 +454,12 @@ pub fn estimate_radiance_direct(
 
         match sphere.reflection {
             Reflection::Diffuse => {
-                let mut accumulated_flux = glm::zero::<glm::Vec3>();
+                let mut accumulated_flux = glm::zero::<glm::DVec3>();
                 for _ in 0..128 {
                     let random_dir = random_vec_sphere(rand);
 
-                    let light_pos = scene.spheres[LIGHT_ID].pos
-                        + (scene.spheres[LIGHT_ID].radius + 0.01) * random_dir;
+                    let light_pos =
+                        scene.spheres[LIGHT_ID].pos + scene.spheres[LIGHT_ID].radius * random_dir;
                     let light_normal = (light_pos - scene.spheres[0].pos).normalize();
                     // シャドウレイ
                     let ray_dir = (light_pos - hit_pos).normalize();
@@ -449,7 +469,7 @@ pub fn estimate_radiance_direct(
 
                     if dot0 >= 0.0 && dot1 >= 0.0 {
                         let g = dot0 * dot1 / dist2;
-                        let shadow_ray = Ray::new(hit_pos + surface_normal * 0.1, ray_dir);
+                        let shadow_ray = Ray::new_with_offset(hit_pos, ray_dir, &surface_normal);
                         if let Some((_, id2)) = scene.intersect(&shadow_ray) {
                             if id2 == LIGHT_ID {
                                 // 光源の寄与
@@ -457,7 +477,7 @@ pub fn estimate_radiance_direct(
                                     + glm::matrix_comp_mult(
                                         &scene.spheres[LIGHT_ID].emission,
                                         &sphere.color,
-                                    ) * std::f32::consts::FRAC_1_PI
+                                    ) * std::f64::consts::FRAC_1_PI
                                         * g
                                         / (1.0
                                             / (4.0
@@ -473,11 +493,11 @@ pub fn estimate_radiance_direct(
             }
             Reflection::Refraction => {
                 if depth > 5 {
-                    return glm::zero::<glm::Vec3>();
+                    return glm::zero::<glm::DVec3>();
                 }
                 match calc_refraction_behavior(&ray.dir, &geometry_normal, &surface_normal) {
                     Refraction::TotalReflection(dir) => {
-                        let ray = Ray::new(hit_pos, dir);
+                        let ray = Ray::new_with_offset(hit_pos, dir, &surface_normal);
                         return sphere.emission
                             + glm::matrix_comp_mult(
                                 &sphere.color,
@@ -490,15 +510,17 @@ pub fn estimate_radiance_direct(
                         probability,
                     ) => {
                         if depth > 2 {
-                            if rand.gen::<f32>() < probability {
-                                let ray = Ray::new(hit_pos, reflect_dir);
+                            if rand.gen::<f64>() < probability {
+                                let ray =
+                                    Ray::new_with_offset(hit_pos, reflect_dir, &surface_normal);
                                 let rad = glm::matrix_comp_mult(
                                     &sphere.color,
                                     &(estimate_radiance_direct(scene, &ray, depth + 1, rand) * rp),
                                 ) / probability;
                                 return sphere.emission + rad;
                             } else {
-                                let ray = Ray::new(hit_pos, refract_dir);
+                                let ray =
+                                    Ray::new_with_offset(hit_pos, refract_dir, &(-surface_normal));
                                 let rad = glm::matrix_comp_mult(
                                     &sphere.color,
                                     &(estimate_radiance_direct(scene, &ray, depth + 1, rand) * tp),
@@ -506,8 +528,10 @@ pub fn estimate_radiance_direct(
                                 return sphere.emission + rad;
                             }
                         } else {
-                            let ray_re = Ray::new(hit_pos, reflect_dir);
-                            let ray_tr = Ray::new(hit_pos, refract_dir);
+                            let ray_re =
+                                Ray::new_with_offset(hit_pos, reflect_dir, &surface_normal);
+                            let ray_tr =
+                                Ray::new_with_offset(hit_pos, refract_dir, &(-surface_normal));
                             let rad = estimate_radiance_direct(scene, &ray_re, depth + 1, rand)
                                 * rp
                                 + estimate_radiance_direct(scene, &ray_tr, depth + 1, rand) * tp;
@@ -526,7 +550,7 @@ pub fn direct_visalization_photonmap(
     scene: &Scene,
     ray: &Ray,
     photon_map: &PhotonMap,
-) -> glm::Vec3 {
+) -> glm::DVec3 {
     if let Some((dist, idx)) = scene.intersect(ray) {
         let sphere = &scene.spheres[idx];
         let hit_pos = ray.pos + ray.dir * dist;
@@ -539,7 +563,7 @@ pub fn direct_visalization_photonmap(
         let arg = PhotonCollectArg::new(0.1, 1, hit_pos, surface_normal);
         let nearest_photons = photon_map.collect_photons(&arg);
         if !nearest_photons.queue.is_empty() {
-            let mut accum = glm::zero::<glm::Vec3>();
+            let mut accum = glm::zero::<glm::DVec3>();
             for n in nearest_photons.queue {
                 accum += n.photon.power;
             }
@@ -550,14 +574,14 @@ pub fn direct_visalization_photonmap(
 }
 
 enum Refraction {
-    TotalReflection(glm::Vec3),
-    ReflectionOrTransmission((glm::Vec3, f32), (glm::Vec3, f32), f32),
+    TotalReflection(glm::DVec3),
+    ReflectionOrTransmission((glm::DVec3, f64), (glm::DVec3, f64), f64),
 }
 
 fn calc_refraction_behavior(
-    incoming_dir: &glm::Vec3,
-    geometry_normal: &glm::Vec3,
-    surface_normal: &glm::Vec3,
+    incoming_dir: &glm::DVec3,
+    geometry_normal: &glm::DVec3,
+    surface_normal: &glm::DVec3,
 ) -> Refraction {
     let reflection_dir =
         (incoming_dir - geometry_normal * 2.0 * geometry_normal.dot(&incoming_dir)).normalize();
